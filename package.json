@@ -1,0 +1,30 @@
+{
+  "name": "n8n-nodes-justfill",
+  "version": "0.1.0",
+  "description": "Fill existing PDF forms — including scanned and flattened ones — from n8n data, using a layout you set up once at justfill.app",
+  "keywords": ["n8n-community-node-package", "pdf", "pdf-form", "fill-pdf", "mail-merge", "justfill"],
+  "license": "MIT",
+  "homepage": "https://justfill.app/integrations/n8n-fill-pdf-forms?utm_source=npm&utm_medium=referral&utm_campaign=n8n_node",
+  "author": { "name": "JustFill", "email": "hello@justfill.app" },
+  "repository": { "type": "git", "url": "https://github.com/mrmaciej1/n8n-nodes-justfill.git" },
+  "engines": { "node": ">=20.15" },
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc && cp nodes/JustFill/*.svg dist/nodes/JustFill/",
+    "lint": "tsc --noEmit"
+  },
+  "files": ["dist"],
+  "n8n": {
+    "n8nNodesApiVersion": 1,
+    "credentials": ["dist/credentials/JustFillApi.credentials.js"],
+    "nodes": ["dist/nodes/JustFill/JustFill.node.js"]
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "n8n-workflow": "^1.82.0",
+    "typescript": "^5.5.0"
+  },
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
+}
