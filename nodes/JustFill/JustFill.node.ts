@@ -5,7 +5,7 @@ import type {
 	INodeType,
 	INodeTypeDescription,
 } from 'n8n-workflow';
-import { NodeOperationError } from 'n8n-workflow';
+import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 /**
  * Pole zapisanego szablonu, TAK JAK ZWRACA JE API.
@@ -75,14 +75,19 @@ export class JustFill implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'JustFill',
 		name: 'justFill',
-		icon: 'file:justfill.svg',
+		// Ikona niesie wlasne ciemne tlo z jasna trescia, wiec ten sam plik jest
+		// poprawny w obu motywach — deklarujemy oba warianty jawnie, bo n8n tego oczekuje.
+		icon: { light: 'file:justfill.svg', dark: 'file:justfill.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
 		description: 'Fill existing PDF forms — including scanned and flattened ones',
+		// Wypelnianie formularza jest sensownym narzedziem dla agenta AI, a n8n
+		// wymaga jawnej deklaracji zamiast domyslania sie.
+		usableAsTool: true,
 		defaults: { name: 'JustFill' },
-		inputs: ['main'],
-		outputs: ['main'],
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'justFillApi', required: true }],
 		requestDefaults: {
 			baseURL: '={{$credentials.baseUrl}}',
@@ -124,7 +129,7 @@ export class JustFill implements INodeType {
 				default: '{}',
 				displayOptions: { show: { operation: ['fill'] } },
 				description:
-					'Object mapping field name (or id) to the text to write. Fields you omit stay empty. For checkboxes use "true", "yes" or "x".',
+					'Object mapping field name (or ID) to the text to write. Fields you omit stay empty. For checkboxes use "true", "yes" or "x".',
 			},
 			{
 				displayName: 'Options',

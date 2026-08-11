@@ -10,6 +10,11 @@ export class JustFillApi implements ICredentialType {
 
 	displayName = 'JustFill API';
 
+	// Weryfikacja n8n wymaga ikony takze na klasie poswiadczen, nie tylko na
+	// wezle. Plik kopiuje sie obok skompilowanej klasy (patrz skrypt `build`),
+	// zeby nie polegac na sciezce wzglednej wychodzacej z katalogu.
+	icon = 'file:justfill.svg' as const;
+
 	documentationUrl = 'https://justfill.app/mcp';
 
 	properties: INodeProperties[] = [
