@@ -26,9 +26,10 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      # Provenance wymaga npm >= 9.5; obraz runnera bywa starszy.
-      - run: npm install -g npm@latest
-
+      # NIE aktualizuj tu npm globalnie. `npm@latest` to dzis npm 12, ktory
+      # wymaga Node >= 22 i wywala sie na Node 20 bledem EBADENGINE. Provenance
+      # dziala od npm 9.5, a Node 20 przynosi npm 10.8 — czyli warunek jest
+      # spelniony bez zadnej aktualizacji.
       - run: npm ci
 
       # `files: ["dist"]` w package.json — bez builda paczka wyszlaby pusta.
