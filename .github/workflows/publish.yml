@@ -1,0 +1,39 @@
+# Publikacja do npm z provenance.
+#
+# Od 1 maja 2026 weryfikacja wezlow spolecznosciowych n8n wymaga, zeby paczka
+# byla publikowana przez GitHub Actions z oswiadczeniem provenance — ono
+# kryptograficznie wiaze artefakt w npm z tym repozytorium i tym workflow.
+# Publikacja z laptopa daje paczke, ktorej n8n nie zweryfikuje.
+name: publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Bez tego provenance nie powstanie — to jest cala tajemnica tego pliku.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          registry-url: https://registry.npmjs.org
+
+      # Provenance wymaga npm >= 9.5; obraz runnera bywa starszy.
+      - run: npm install -g npm@latest
+
+      - run: npm ci
+
+      # `files: ["dist"]` w package.json — bez builda paczka wyszlaby pusta.
+      - run: npm run build
+
+      - run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
