@@ -3,7 +3,7 @@
 Fill existing PDF forms from n8n data — including **scanned and flattened PDFs**
 that have no form fields at all.
 
-You set the layout up **once**, visually, at [justfill.app](https://justfill.app).
+You set the layout up **once**, visually, at [justfill.app](https://justfill.app/?utm_source=n8n&utm_medium=integration&utm_campaign=community_node).
 This node then fills that form for every item flowing through your workflow: a
 spreadsheet row, a CRM record, a webhook payload. No re-detection per run, and
 the original PDF is never rebuilt — layout, fonts and pagination stay exactly as
