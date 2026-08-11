@@ -30,7 +30,11 @@ jobs:
       # wymaga Node >= 22 i wywala sie na Node 20 bledem EBADENGINE. Provenance
       # dziala od npm 9.5, a Node 20 przynosi npm 10.8 — czyli warunek jest
       # spelniony bez zadnej aktualizacji.
-      - run: npm ci
+      # `--ignore-scripts`: `n8n-workflow` ciagnie natywne `isolated-vm`, ktore
+      # nie kompiluje sie na Node 20 (blad w naglowkach V8). Potrzebujemy tej
+      # paczki WYLACZNIE do typow przy `tsc`, a publikowany artefakt nie ma
+      # zadnych zaleznosci runtime — wiec kompilacja natywna jest tu zbedna.
+      - run: npm ci --ignore-scripts
 
       # `files: ["dist"]` w package.json — bez builda paczka wyszlaby pusta.
       - run: npm run build
