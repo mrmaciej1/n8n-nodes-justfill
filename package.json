@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-justfill",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Fill existing PDF forms — including scanned and flattened ones — from n8n data, using a layout you set up once at justfill.app",
   "keywords": [
     "n8n-community-node-package",

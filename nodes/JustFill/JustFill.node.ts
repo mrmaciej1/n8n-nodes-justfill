@@ -75,9 +75,10 @@ export class JustFill implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'JustFill',
 		name: 'justFill',
-		// Ikona niesie wlasne ciemne tlo z jasna trescia, wiec ten sam plik jest
-		// poprawny w obu motywach — deklarujemy oba warianty jawnie, bo n8n tego oczekuje.
-		icon: { light: 'file:justfill.svg', dark: 'file:justfill.svg' },
+		// Dwa ODREBNE pliki: n8n odrzuca wskazanie tego samego dla obu motywow.
+		// Podstawowa ikona ma ciemny kafelek, wiec na ciemnej kanwie zlewalaby sie
+		// w plame — wariant `dark` odwraca kafelek i dokument, akcent marki zostaje.
+		icon: { light: 'file:justfill.svg', dark: 'file:justfill.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
