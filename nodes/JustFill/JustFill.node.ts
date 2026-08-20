@@ -292,21 +292,57 @@ export class JustFill implements INodeType {
 				);
 			}
 
+			// `/api/generate/pdf` przyjmuje WYŁĄCZNIE multipart/form-data.
+			//
+			// Do 0.1.3 stał tu obiekt w składni biblioteki `request`
+			// (`pdf_file: { value, options }`), ale pomocnik HTTP n8n opiera się na
+			// axiosie: obiekt bez nagłówka multipart leci jako JSON, więc serwer
+			// nie widział ANI pliku, ANI pól i odpowiadał 422 („pdf_file: Field
+			// required"). Operacja `fill` — jedyny powód istnienia tego węzła —
+			// nie działała w ogóle. Wyszło to dopiero przy przejściu całej ścieżki
+			// w czystej instancji n8n 2.34 (20.08.2026); paczka miała wtedy
+			// 0 instalacji, więc nikt tego nie zgłosił.
+			//
+			// Kopertę składamy ręcznie, zamiast dokładać zależność `form-data`:
+			// jeden plik i dwa pola tekstowe to kilkanaście linii, a publikowany
+			// artefakt zostaje BEZ zależności runtime — tak jak zakłada workflow
+			// publikacji (`npm ci --ignore-scripts`).
+			const granica = `----justfill${createHash('sha256')
+				.update(`${hash}:${i}:${doWypelnienia.length}`)
+				.digest('hex')
+				.slice(0, 24)}`;
+			const poleTekstowe = (nazwa: string, wartosc: string): Buffer =>
+				Buffer.from(
+					`--${granica}\r\nContent-Disposition: form-data; name="${nazwa}"\r\n\r\n${wartosc}\r\n`,
+					'utf8',
+				);
+			const cialoMultipart = Buffer.concat([
+				Buffer.from(
+					`--${granica}\r\nContent-Disposition: form-data; name="pdf_file"; filename="document.pdf"\r\n` +
+						'Content-Type: application/pdf\r\n\r\n',
+					'utf8',
+				),
+				pdf,
+				Buffer.from('\r\n', 'utf8'),
+				poleTekstowe('fields_json', JSON.stringify(doWypelnienia)),
+				poleTekstowe('flatten', (opcje.flatten ?? true) ? 'true' : 'false'),
+				Buffer.from(`--${granica}--\r\n`, 'utf8'),
+			]);
+
 			const odpowiedz = (await this.helpers.httpRequestWithAuthentication.call(
 				this,
 				'justFillApi',
 				{
 					method: 'POST',
 					url: `${baza}/api/generate/pdf`,
-					body: {
-						pdf_file: {
-							value: pdf,
-							options: { filename: 'document.pdf', contentType: 'application/pdf' },
-						},
-						fields_json: JSON.stringify(doWypelnienia),
-						flatten: (opcje.flatten ?? true) ? 'true' : 'false',
+					body: cialoMultipart,
+					headers: {
+						'content-type': `multipart/form-data; boundary=${granica}`,
+						accept: 'application/pdf',
 					},
-					headers: { accept: 'application/pdf' },
+					// Bez tego pomocnik dokleiłby serializację JSON-a i zepsuł
+					// zarówno wysyłkę bajtów, jak i odbiór PDF-a.
+					json: false,
 					encoding: 'arraybuffer',
 					returnFullResponse: true,
 				},
