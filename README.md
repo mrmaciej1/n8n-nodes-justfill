@@ -3,15 +3,25 @@
 Fill existing PDF forms from n8n data — including **scanned and flattened PDFs**
 that have no form fields at all.
 
-You set the layout up **once**, visually, at [justfill.app](https://justfill.app/?utm_source=n8n&utm_medium=integration&utm_campaign=community_node).
+You set the layout up **once**, visually, with the
+[JustFill n8n setup guide](https://justfill.app/integrations/n8n-fill-pdf-forms?utm_source=github&utm_medium=referral&utm_campaign=b2b_pdf_automation_2026q3&utm_content=n8n_node_readme).
 This node then fills that form for every item flowing through your workflow: a
 spreadsheet row, a CRM record, a webhook payload. No re-detection per run, and
 the original PDF is never rebuilt — layout, fonts and pagination stay exactly as
 they were.
 
+Want to inspect a complete workflow before installing the node? Start with the
+[free reviewed template in the official n8n catalog](https://n8n.io/workflows/17274-fill-pdf-forms-from-json-data-with-justfill-and-a-form-trigger/).
+It accepts a PDF and JSON, maps values to reviewed field names, fills the
+existing document, and returns a temporary download link.
+
 ## Installation
 
 Settings → **Community Nodes** → Install → `n8n-nodes-justfill`
+
+If your source is already Excel or CSV and you do not need n8n yet, use the
+[guided five-row PDF mail merge sample](https://justfill.app/solutions/fill-pdf-from-excel?utm_source=github&utm_medium=referral&utm_campaign=b2b_pdf_automation_2026q3&utm_content=n8n_node_readme_excel_batch)
+to verify one-filled-PDF-per-row output first.
 
 ## Credentials
 
