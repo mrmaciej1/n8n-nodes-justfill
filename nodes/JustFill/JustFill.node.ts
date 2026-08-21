@@ -28,6 +28,35 @@ interface PoleSzablonu {
 	pageIndex?: number;
 	page_index?: number;
 	fieldDescription?: string | null;
+	field_description?: string | null;
+	fontSize?: number | null;
+	font_size?: number | null;
+	textAlign?: string | null;
+	text_align?: string | null;
+	verticalAlign?: string | null;
+	vertical_align?: string | null;
+	fillableFieldName?: string | null;
+	fillable_field_name?: string | null;
+	fillableFieldType?: string | null;
+	fillable_field_type?: string | null;
+	fillableExportValue?: string | null;
+	fillable_export_value?: string | null;
+	fillableMaxLength?: number | null;
+	fillable_max_length?: number | null;
+	fillableIsComb?: boolean | null;
+	fillable_is_comb?: boolean | null;
+	fillableIsMultiline?: boolean | null;
+	fillable_is_multiline?: boolean | null;
+	fillableTextAlign?: number | null;
+	fillable_text_align?: number | null;
+	fillableTooltip?: string | null;
+	fillable_tooltip?: string | null;
+	fillableIsRequired?: boolean | null;
+	fillable_is_required?: boolean | null;
+	fillableDefaultValue?: string | null;
+	fillable_default_value?: string | null;
+	fillableOptions?: unknown[] | null;
+	fillable_options?: unknown[] | null;
 	type?: string | null;
 	[k: string]: unknown;
 }
@@ -68,7 +97,62 @@ function skrotDokumentu(pdf: Buffer): string {
  * opcjonalny dodatek — kolejność musi być właśnie taka.
  */
 function nazwaPola(p: PoleSzablonu): string {
-	return (p.name || '').trim() || (p.fieldDescription || '').trim() || String(p.id ?? '');
+	return (
+		(p.name || '').trim() ||
+		(p.fieldDescription || p.field_description || '').trim() ||
+		String(p.id ?? '')
+	);
+}
+
+/**
+ * Convert one saved-layout field into the exact payload accepted by
+ * `/api/generate/pdf`.
+ *
+ * AcroForm metadata is not optional decoration here. Without
+ * `fillableFieldName`, the API has to draw a page-content overlay underneath
+ * the existing widget. Opaque empty widgets then cover that text in Chrome,
+ * Adobe and Poppler: the execution reports success but the visible form stays
+ * blank. Forwarding the native name makes the API update the widget and, when
+ * requested, flatten its visible appearance.
+ */
+export function poleDoGenerowania(
+	pole: PoleSzablonu,
+	value: string,
+): Record<string, unknown> | null {
+	const g = geometria(pole);
+	if (!g) return null;
+
+	return {
+		id: pole.id ?? nazwaPola(pole),
+		value,
+		...g,
+		pageIndex: pole.pageIndex ?? pole.page_index ?? 0,
+		fieldDescription: pole.fieldDescription ?? pole.field_description ?? null,
+		fontSize: pole.fontSize ?? pole.font_size ?? 0,
+		isCalibrated: true,
+		textAlign: pole.textAlign ?? pole.text_align ?? null,
+		verticalAlign: pole.verticalAlign ?? pole.vertical_align ?? null,
+		fillableFieldName:
+			pole.fillableFieldName ?? pole.fillable_field_name ?? null,
+		fillableFieldType:
+			pole.fillableFieldType ?? pole.fillable_field_type ?? null,
+		fillableExportValue:
+			pole.fillableExportValue ?? pole.fillable_export_value ?? null,
+		fillableMaxLength:
+			pole.fillableMaxLength ?? pole.fillable_max_length ?? null,
+		fillableIsComb: pole.fillableIsComb ?? pole.fillable_is_comb ?? false,
+		fillableIsMultiline:
+			pole.fillableIsMultiline ?? pole.fillable_is_multiline ?? null,
+		fillableTextAlign:
+			pole.fillableTextAlign ?? pole.fillable_text_align ?? null,
+		fillableTooltip:
+			pole.fillableTooltip ?? pole.fillable_tooltip ?? null,
+		fillableIsRequired:
+			pole.fillableIsRequired ?? pole.fillable_is_required ?? null,
+		fillableDefaultValue:
+			pole.fillableDefaultValue ?? pole.fillable_default_value ?? null,
+		fillableOptions: pole.fillableOptions ?? pole.fillable_options ?? null,
+	};
 }
 
 export class JustFill implements INodeType {
@@ -255,26 +339,15 @@ export class JustFill implements INodeType {
 				}
 				const tekst = wartosc === null || wartosc === undefined ? '' : String(wartosc);
 				if (tekst === '') continue;
-				const g = geometria(pole);
-				if (!g) {
+				const poleGenerowania = poleDoGenerowania(pole, tekst);
+				if (!poleGenerowania) {
 					throw new NodeOperationError(
 						this.getNode(),
 						`Field "${klucz}" has no usable geometry in the saved layout (missing box_2d). Re-save the template at justfill.app.`,
 						{ itemIndex: i },
 					);
 				}
-				doWypelnienia.push({
-					id: pole.id ?? nazwaPola(pole),
-					value: tekst,
-					x: g.x,
-					y: g.y,
-					w: g.w,
-					h: g.h,
-					pageIndex: pole.pageIndex ?? pole.page_index ?? 0,
-					fieldDescription: pole.fieldDescription ?? null,
-					fontSize: 0, // 0 = serwer dobiera rozmiar z wysokości pola
-					isCalibrated: true, // układ pochodzi z szablonu, nie z detekcji
-				});
+				doWypelnienia.push(poleGenerowania);
 			}
 
 			if (nieznane.length > 0 && (opcje.failOnUnknown ?? true)) {

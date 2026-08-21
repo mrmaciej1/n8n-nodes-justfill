@@ -1,6 +1,6 @@
 {
   "name": "n8n-nodes-justfill",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Fill existing PDF forms — including scanned and flattened ones — from n8n data, using a layout you set up once at justfill.app",
   "keywords": [
     "n8n-community-node-package",
@@ -26,7 +26,8 @@
   "main": "index.js",
   "scripts": {
     "build": "tsc && cp nodes/JustFill/*.svg dist/nodes/JustFill/ && cp nodes/JustFill/*.svg dist/credentials/",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "npm run build && node --test tests/*.test.cjs"
   },
   "files": [
     "dist"
