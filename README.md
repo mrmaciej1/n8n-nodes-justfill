@@ -11,9 +11,12 @@ the original PDF is never rebuilt — layout, fonts and pagination stay exactly 
 they were.
 
 Want to inspect a complete workflow before installing the node? Start with the
-[free reviewed template in the official n8n catalog](https://n8n.io/workflows/17274-fill-pdf-forms-from-json-data-with-justfill-and-a-form-trigger/).
+[current workflow JSON from GitHub](https://github.com/mrmaciej1/justfill-mcp/blob/main/examples/n8n/fill-pdf-workflow.json).
 It accepts a PDF and JSON, maps values to reviewed field names, fills the
 existing document, and returns a temporary download link.
+
+The catalog update for template 17274 was submitted on September 5, 2026 and
+is under review. Use the repository file until the updated template is published.
 
 ## Installation
 
