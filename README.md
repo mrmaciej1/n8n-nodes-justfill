@@ -27,6 +27,12 @@ The node submission is separate from the workflow-template review above.
 
 Settings → **Community Nodes** → Install → `n8n-nodes-justfill`
 
+[Watch the 74-second uncut walkthrough](https://github.com/mrmaciej1/n8n-nodes-justfill/releases/download/v0.1.5/justfill-n8n-complete-walkthrough.webm):
+install 0.1.5, test a new masked credential, list fields, fill and open a synthetic
+PDF, then let AI Agent **2.2** call the field-listing tool with a local CPU model.
+The agent example was prepared before recording. This is a working demonstration,
+not n8n approval; the portal version update remains pending.
+
 If your source is already Excel or CSV and you do not need n8n yet, use the
 [guided five-row PDF mail merge sample](https://justfill.app/solutions/fill-pdf-from-excel?utm_source=github&utm_medium=referral&utm_campaign=b2b_pdf_automation_2026q3&utm_content=n8n_node_readme_excel_batch)
 to verify one-filled-PDF-per-row output first.
@@ -138,7 +144,8 @@ Multi-item agent workflows have not been validated by this single-PDF check.
 
 This example lists fields; it does not demonstrate agent-driven PDF delivery.
 Use ordinary workflow nodes for filling and handling the binary PDF output.
-It is also not a complete Creator Portal verification video or n8n approval.
+The walkthrough linked above includes this scoped tool action alongside ordinary
+PDF filling. It does not establish compatibility with Agent 3.1 or n8n approval.
 
 ## Notes
 
