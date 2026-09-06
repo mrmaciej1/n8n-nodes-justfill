@@ -20,6 +20,11 @@ is under review. Use the repository file until the updated template is published
 
 ## Installation
 
+This community-node installation requires **self-hosted n8n**. The package is
+not yet verified for n8n Cloud. As of September 6, 2026, the Creator Portal
+still lists version 0.1.3 as `Awaiting Video`; the current npm package is 0.1.5.
+The node submission is separate from the workflow-template review above.
+
 Settings → **Community Nodes** → Install → `n8n-nodes-justfill`
 
 If your source is already Excel or CSV and you do not need n8n yet, use the
