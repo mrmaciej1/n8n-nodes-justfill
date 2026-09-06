@@ -14,22 +14,23 @@ const fields = [
 	{ id: 'f_note', name: 'Note', pageIndex: 1, box_2d: [300, 200, 330, 600] },
 ];
 
-function harness({ operation = 'listFields', pdf = originalPdf, values = {}, options = {} } = {}) {
+function harness({ operation = 'listFields', pdf = originalPdf, values = {}, options = {},
+	binaryProperty = 'data', inputData = [{ json: {}, binary: { data: { fileName: 'blank.pdf' } } }] } = {}) {
 	const calls = [];
 	const prepared = { data: 'mock-binary-reference', mimeType: 'application/pdf' };
 	const context = {
-		getInputData: () => [{ json: {}, binary: { data: { fileName: 'blank.pdf' } } }],
+		getInputData: () => inputData,
 		getCredentials: async () => ({ baseUrl: 'https://justfill.invalid/' }),
 		getNode: () => ({ name: 'JustFill', type: 'justFill', typeVersion: 1, position: [0, 0], parameters: {} }),
 		getNodeParameter: (name) => {
-			const parameters = { operation, binaryProperty: 'data', values, options };
+			const parameters = { operation, binaryProperty, values, options };
 			assert.ok(Object.hasOwn(parameters, name), `Unexpected parameter: ${name}`);
 			return parameters[name];
 		},
 		helpers: {
 			getBinaryDataBuffer: async (index, property) => {
 				assert.equal(index, 0);
-				assert.equal(property, 'data');
+				assert.equal(property, binaryProperty);
 				return pdf;
 			},
 			httpRequestWithAuthentication: async (credential, request) => {
@@ -80,6 +81,21 @@ test('changed PDF bytes use a different layout lookup even with the same input f
 	assert.equal(changed.calls.length, 1);
 	assert.notEqual(changed.calls[0].url, unchanged.calls[0].url);
 });
+
+for (const source of [
+	{ data: 'filesystem-v2', id: 'filesystem-v2:synthetic-reference', mimeType: 'application/pdf' },
+	{ data: originalPdf.toString('base64'), mimeType: 'application/pdf' },
+]) {
+	test(`a binary expression object passes unchanged to n8n's helper (${source.id ? 'stored' : 'inline'})`, async () => {
+		// Models the argument resolved by n8n, not n8n's expression evaluator or
+		// storage service. A real engine/UI check is documented separately.
+		const node = harness({ binaryProperty: source, inputData: [{ json: {} }] });
+		const result = await node.run();
+		assert.equal(result[0][0].json.contentHash, hashOf(originalPdf));
+		assert.equal(result[0][0].json.fields.length, 3);
+		assert.equal(node.calls.length, 1);
+	});
+}
 
 test('Fill PDF submits only non-empty mapped entries and reports unmatched keys and watermark mode', async () => {
 	const node = harness({

@@ -97,6 +97,49 @@ file with your workflow. The same filename or download URL is not enough:
 a publisher can replace the file, and re-exporting or re-compressing can change
 its bytes. If the bytes change, review and save a layout for that version too.
 
+## Using List Fields as an AI tool
+
+A tool call does not automatically receive the agent's binary input. Leaving
+`Input Binary Field` at `data` can fail even when the PDF is visible in the
+agent's preceding step. In the tool, switch that parameter to **Expression**
+and reference the node that downloaded the original PDF:
+
+```javascript
+{{ $('Synthetic PDF').item.binary.data }}
+```
+
+Replace `Synthetic PDF` and `data` with your actual node and binary-property
+names. This passes the binary object to n8n's binary helper; it is not a URL,
+base64 text or an AI-generated file reference. Keep the source selection under
+workflow control, not `$fromAI()`.
+
+The following **single-PDF** setup was tested on September 6, 2026:
+
+- Self-hosted n8n **2.34.4**, JustFill package **0.1.5**, AI Agent node
+  **2.2** (`typeVersion` in workflow JSON).
+- Manual Trigger → HTTP Request (file response) → AI Agent, with JustFill
+  connected as a tool, operation `List Fields`, using the expression above.
+- Tool name `list_pdf_fields`; manual description:
+  `Read the saved field names of the attached supplier intake PDF.`
+- Local Ollama **0.33.1**, `qwen3:0.6b`, thinking off, temperature 0,
+  context 2048, maximum 256 output tokens. No cloud model was used.
+- Agent system message: `You are a helpful assistant.` Prompt:
+  `List the field names of the attached supplier intake PDF. Use the list_pdf_fields tool. Do not guess field names.`
+
+The execution trace contained a real tool call, the three saved field names in
+its observation, and the same names in the agent's answer. Earlier prompts
+returned text or an empty array without invoking the tool: a green workflow
+status alone is not enough. Check the tool execution and observation.
+
+**Version limitation:** in the same setup, AI Agent **3.1** executed JustFill
+and its node output contained the fields, but the agent received an empty tool
+observation. That configuration is not verified by the successful 2.2 test.
+Multi-item agent workflows have not been validated by this single-PDF check.
+
+This example lists fields; it does not demonstrate agent-driven PDF delivery.
+Use ordinary workflow nodes for filling and handling the binary PDF output.
+It is also not a complete Creator Portal verification video or n8n approval.
+
 ## Notes
 
 - Start from a blank source. Omitted, null and empty-string values are not
