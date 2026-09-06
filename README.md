@@ -105,6 +105,22 @@ its bytes. If the bytes change, review and save a layout for that version too.
 
 ## Using List Fields as an AI tool
 
+Start from the [AI Agent 3.1 example](examples/ai-agent-list-fields.json).
+Import it into self-hosted n8n, follow its setup note, then select your own
+JustFill and local Ollama credentials. The example contains no keys or pinned
+results and only lists saved fields; it does not generate or deliver PDFs.
+
+Keep the workflow execution order at **v1**. If you create workflow JSON or
+use the REST API, set this explicitly:
+
+```json
+{ "settings": { "executionOrder": "v1" } }
+```
+
+On n8n 2.34.4, omitted settings select the legacy execution order. In our
+Agent 3.1 test that resumed the agent before its JustFill tool had finished,
+so the answer reported an empty result despite correct tool output.
+
 A tool call does not automatically receive the agent's binary input. Leaving
 `Input Binary Field` at `data` can fail even when the PDF is visible in the
 agent's preceding step. In the tool, switch that parameter to **Expression**
@@ -122,7 +138,8 @@ workflow control, not `$fromAI()`.
 The following **single-PDF** setup was tested on September 6, 2026:
 
 - Self-hosted n8n **2.34.4**, JustFill package **0.1.5**, AI Agent node
-  **2.2** (`typeVersion` in workflow JSON).
+  **3.1** with **executionOrder: v1**; the earlier video uses node **2.2**
+  (`typeVersion` in workflow JSON).
 - Manual Trigger → HTTP Request (file response) → AI Agent, with JustFill
   connected as a tool, operation `List Fields`, using the expression above.
 - Tool name `list_pdf_fields`; manual description:
@@ -137,15 +154,21 @@ its observation, and the same names in the agent's answer. Earlier prompts
 returned text or an empty array without invoking the tool: a green workflow
 status alone is not enough. Check the tool execution and observation.
 
-**Version limitation:** in the same setup, AI Agent **3.1** executed JustFill
-and its node output contained the fields, but the agent received an empty tool
-observation. That configuration is not verified by the successful 2.2 test.
+**Correction, September 6:** the earlier Agent 3.1 warning was too broad.
+An omitted-settings control reproduced the empty observation. Two fresh 3.1
+executions with `executionOrder: "v1"` both received the exact tool result and
+returned all three field names. The node package and n8n runtime were unchanged;
+no downgrade or core patch was needed. This matches the scheduling issue
+described in [n8n #26202](https://github.com/n8n-io/n8n/issues/26202), which is
+closed as not reproduced, not marked fixed. Do not change a production
+workflow's execution order without checking its other branches too.
 Multi-item agent workflows have not been validated by this single-PDF check.
 
 This example lists fields; it does not demonstrate agent-driven PDF delivery.
 Use ordinary workflow nodes for filling and handling the binary PDF output.
 The walkthrough linked above includes this scoped tool action alongside ordinary
-PDF filling. It does not establish compatibility with Agent 3.1 or n8n approval.
+PDF filling. That video still demonstrates Agent 2.2; the later 3.1 comparison
+is separate execution evidence, not a replacement video or n8n approval.
 
 ## Notes
 

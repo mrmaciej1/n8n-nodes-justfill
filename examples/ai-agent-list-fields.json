@@ -1,0 +1,158 @@
+{
+  "name": "JustFill — List Fields with AI Agent 3.1",
+  "nodes": [
+    {
+      "id": "manual",
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "parameters": {}
+    },
+    {
+      "id": "pdf",
+      "name": "Synthetic PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        220,
+        0
+      ],
+      "parameters": {
+        "url": "https://raw.githubusercontent.com/mrmaciej1/justfill-mcp/main/examples/n8n/reviewer-sample-supplier-intake.pdf",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        440,
+        0
+      ],
+      "parameters": {
+        "promptType": "define",
+        "text": "List the field names of the attached supplier intake PDF. Use the list_pdf_fields tool. Do not guess field names.",
+        "options": {
+          "systemMessage": "You are a helpful assistant.",
+          "maxIterations": 3,
+          "returnIntermediateSteps": true
+        }
+      }
+    },
+    {
+      "id": "model",
+      "name": "Local CPU model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        360,
+        240
+      ],
+      "parameters": {
+        "model": "qwen3:0.6b",
+        "options": {
+          "think": false,
+          "numGpu": 0,
+          "numCtx": 2048,
+          "numThread": 2,
+          "numPredict": 256,
+          "temperature": 0,
+          "keepAlive": "60s"
+        }
+      }
+    },
+    {
+      "id": "tool",
+      "name": "list_pdf_fields",
+      "type": "n8n-nodes-justfill.justFillTool",
+      "typeVersion": 1,
+      "position": [
+        620,
+        240
+      ],
+      "parameters": {
+        "operation": "listFields",
+        "binaryProperty": "={{ $('Synthetic PDF').item.binary.data }}",
+        "descriptionType": "manual",
+        "toolDescription": "Read the saved field names of the attached supplier intake PDF."
+      }
+    },
+    {
+      "id": "setup",
+      "name": "Setup and scope",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -360
+      ],
+      "parameters": {
+        "height": 300,
+        "width": 800,
+        "content": "## List Fields with AI Agent 3.1\n1. Self-hosted n8n: install n8n-nodes-justfill 0.1.5.\n2. Download the exact synthetic PDF from the HTTP node's URL. Open it in your JustFill account, review and save its layout with field names Company name, Vendor reference, Remittance email.\n3. Select your JustFill API credential on list_pdf_fields and your local Ollama credential on Local CPU model. The n8n server must be able to reach Ollama with qwen3:0.6b available.\n4. Keep workflow settings.executionOrder = v1. Execute once and check the tool output, intermediate observation and final answer all contain the three field names.\nSingle synthetic PDF only. No PDF generation or delivery in this example; paid allowances apply when adding clean PDF generation. No real keys or pinned results included. AI-assisted example maintained by JustFill; n8n verification is pending."
+      }
+    }
+  ],
+  "connections": {
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Synthetic PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Synthetic PDF": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Local CPU model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "list_pdf_fields": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  }
+}
