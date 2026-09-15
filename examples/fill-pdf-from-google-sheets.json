@@ -1,0 +1,523 @@
+{
+  "name": "Fill one PDF per Google Sheets row with JustFill",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "fa3ed6bd-97a3-417a-87a2-161eeb8ec099",
+      "name": "Run for every row"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "73a9d32b-f84c-47d9-9c37-e7ecf0ef5874",
+              "name": "apiKey",
+              "value": "jf_live_YOUR_API_KEY_HERE",
+              "type": "string"
+            },
+            {
+              "id": "97af9a61-9fd9-4fa7-badc-aa87da0c052f",
+              "name": "pdfUrl",
+              "value": "https://example.com/your-blank-form.pdf",
+              "type": "string"
+            },
+            {
+              "id": "d80d29df-c756-4274-a4ff-640d0f887910",
+              "name": "fileNameColumn",
+              "value": "Name",
+              "type": "string"
+            },
+            {
+              "id": "c7e2477a-a197-4941-b655-387405b2cf0b",
+              "name": "linkColumn",
+              "value": "PDF link",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        220,
+        0
+      ],
+      "id": "577f6e4a-8394-4d95-b95c-ac54efbea1f1",
+      "name": "Config"
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        440,
+        0
+      ],
+      "id": "982ffb86-d0af-4350-99c8-e9f5875342cf",
+      "name": "Get rows"
+    },
+    {
+      "parameters": {
+        "jsCode": "const cfg = $('Config').first().json;\nif (!/^https?:\\/\\//.test(cfg.pdfUrl || '')) throw new Error('Set pdfUrl in Config to a public link to your blank PDF.');\n// Built here, not inline, so n8n's expression parser never sees `}}` in an object literal.\nreturn [{ json: { openBody: { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'open_pdf', arguments: { url: cfg.pdfUrl } } } } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        660,
+        0
+      ],
+      "id": "c4722c71-908b-4e50-a81c-a5e891ab2134",
+      "name": "Build open request",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://justfill.app/api/mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Config').item.json.apiKey }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.openBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        880,
+        0
+      ],
+      "id": "149c9c06-0a3e-498c-b2fb-44de6b6e4030",
+      "name": "Open PDF"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rpc = $input.first().json;\nif (rpc.error) throw new Error('MCP transport error: ' + JSON.stringify(rpc.error));\nif (rpc.result && rpc.result.isError) throw new Error('MCP tool error: ' + ((rpc.result.content && rpc.result.content[0] && rpc.result.content[0].text) || 'unknown'));\nconst ws = JSON.parse(rpc.result.content[0].text);\nif (ws.error) throw new Error('open_pdf: ' + ws.error);\nconst source = ws.summary && ws.summary.source;\nif (!['template', 'acroform'].includes(source)) {\n  throw new Error('This PDF has no saved JustFill template yet (source: ' + source + '). Open it once at justfill.app, check the fields, give them names that match your column headers and save it as a template. Then run this workflow again.');\n}\nconst cfg = $('Config').first().json;\nconst norm = s => String(s ?? '').normalize('NFC').toLowerCase().replace(/[^\\p{L}\\p{M}\\p{N}]+/gu, '');\nconst byName = new Map();\nfor (const f of ws.fields) { const k = norm(f.name); if (k) byName.set(k, byName.has(k) ? null : f); }\nconst skip = new Set([norm('row_number'), norm(cfg.linkColumn)]);\nconst out = [], unmatched = new Set();\nfor (const row of $('Get rows').all()) {\n  const r = row.json, values = {};\n  for (const [col, v] of Object.entries(r)) {\n    const k = norm(col);\n    if (!k || skip.has(k)) continue;\n    const f = byName.get(k);\n    if (f === null) throw new Error('Two PDF fields share the name for column ' + col + '. Give each field a unique name.');\n    if (!f) { unmatched.add(col); continue; }\n    if (v !== '' && v !== null && v !== undefined) values[f.id] = String(v);\n  }\n  if (!Object.keys(values).length) continue;\n  const base = String(r[cfg.fileNameColumn] ?? ('row-' + r.row_number)).replace(/[\\\\/:*?\"<>|]+/g, ' ').trim() || ('row-' + r.row_number);\n  out.push({ json: {\n    row_number: r.row_number,\n    fileName: base + '.pdf',\n    matched: Object.keys(values).length,\n    unmatchedColumns: [...unmatched],\n    fillBody: { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'fill_pdf', arguments: { workspace_id: ws.summary.workspace_id, values } } },\n  } });\n}\nif (!out.length) throw new Error('No row had a value in a column that matches a PDF field name.');\nreturn out;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1100,
+        0
+      ],
+      "id": "ae69e71a-6927-4ba1-833d-c2db44636910",
+      "name": "Match columns to fields"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1320,
+        0
+      ],
+      "id": "167ec258-1d60-4242-94c7-2a7340c52f73",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://justfill.app/api/mcp",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $('Config').item.json.apiKey }}"
+            },
+            {
+              "name": "Accept",
+              "value": "application/json, text/event-stream"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.fillBody) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1540,
+        120
+      ],
+      "id": "4edf35c2-baba-40ec-a43b-fdce11a6d6e9",
+      "name": "Fill PDF"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rpc = $input.first().json;\nif (rpc.error) throw new Error('MCP transport error: ' + JSON.stringify(rpc.error));\nif (rpc.result && rpc.result.isError) throw new Error('MCP tool error: ' + ((rpc.result.content && rpc.result.content[0] && rpc.result.content[0].text) || 'unknown'));\nconst res = JSON.parse(rpc.result.content[0].text);\nif (res.error) throw new Error('fill_pdf: ' + res.error);\nconst row = $('Loop Over Items').first().json;\n// Each fill replaces the previous download link, so the next node downloads it right away.\nreturn [{ json: { row_number: row.row_number, fileName: row.fileName, download_url: res.download_url, output_mode: res.output_mode, warnings: res.warnings || null } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1760,
+        120
+      ],
+      "id": "d91a7f2d-3ba3-42e0-b1b5-938e78a4bd34",
+      "name": "Read fill result"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.download_url }}",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1980,
+        120
+      ],
+      "id": "5f7ade3d-c3a9-4003-b64a-c8ea8757408e",
+      "name": "Download filled PDF"
+    },
+    {
+      "parameters": {
+        "name": "={{ $('Read fill result').item.json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "root",
+          "cachedResultName": "/ (Root folder)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        2200,
+        120
+      ],
+      "id": "22c9020c-9fd5-4433-a1d8-f70761b3b847",
+      "name": "Save to Google Drive"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "",
+          "mode": "list"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "row_number": "={{ $('Read fill result').item.json.row_number }}",
+            "PDF link": "={{ $json.webViewLink }}"
+          },
+          "matchingColumns": [
+            "row_number"
+          ],
+          "schema": [
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": false
+            },
+            {
+              "id": "PDF link",
+              "displayName": "PDF link",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        2420,
+        120
+      ],
+      "id": "0ace7a8c-f966-4567-845f-d2911ef916b7",
+      "name": "Write link to sheet"
+    },
+    {
+      "parameters": {
+        "content": "## Fill one PDF for every spreadsheet row\n\nA PDF mail merge: each row in your Google Sheet becomes its own filled PDF, saved to Google Drive, with the link written back to the row.\n\n**Before the first run**\n1. Open your blank PDF once at [justfill.app](https://justfill.app), check the fields and give them names that match your column headers (for example `Name`, `Start date`). Save it as a template.\n2. Create a JustFill API key under Account, API keys.\n3. Add a column called `PDF link` to the sheet.\n\nFree accounts get watermarked PDFs. Paid plans produce clean files.",
+        "height": 620,
+        "width": 480,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -560,
+        -280
+      ],
+      "id": "762c3df0-94c8-42be-ad09-c8a001b57d1e",
+      "name": "Sticky Note Overview"
+    },
+    {
+      "parameters": {
+        "content": "### 1. Settings\n\nPaste your JustFill API key and a public link to the same blank PDF you saved as a template. `fileNameColumn` picks the column used to name each file.",
+        "height": 620,
+        "width": 440,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -280
+      ],
+      "id": "f9ce5a1f-6bf7-4ae3-b04f-120f693b4ed2",
+      "name": "Sticky Note Step 1"
+    },
+    {
+      "parameters": {
+        "content": "### 2. Read the sheet and open the PDF\n\nAll rows are read, then the PDF is opened **once**. Because it matches your saved template, the field names come back straight away with no detection step.",
+        "height": 620,
+        "width": 640,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        420,
+        -280
+      ],
+      "id": "ac77350b-f693-46af-b8fb-a7b2af52eec1",
+      "name": "Sticky Note Step 2"
+    },
+    {
+      "parameters": {
+        "content": "### 3. Match columns to fields\n\nColumn headers are matched to field names, ignoring case, spaces and punctuation. Columns without a matching field are skipped and listed in `unmatchedColumns`. Empty rows are skipped.",
+        "height": 620,
+        "width": 440,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1060,
+        -280
+      ],
+      "id": "a45444c0-3975-4c3f-a476-6407b929e510",
+      "name": "Sticky Note Step 3"
+    },
+    {
+      "parameters": {
+        "content": "### 4. Fill, save and link each row\n\nOne row at a time: JustFill fills the PDF, the file is downloaded right away (the next fill replaces the link), uploaded to Google Drive and its link is written to the `PDF link` column of that row.",
+        "height": 620,
+        "width": 1060,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1500,
+        -280
+      ],
+      "id": "e719398b-ead9-499e-815c-ce5964d2658e",
+      "name": "Sticky Note Step 4"
+    }
+  ],
+  "connections": {
+    "Run for every row": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Get rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get rows": {
+      "main": [
+        [
+          {
+            "node": "Build open request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build open request": {
+      "main": [
+        [
+          {
+            "node": "Open PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Open PDF": {
+      "main": [
+        [
+          {
+            "node": "Match columns to fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Match columns to fields": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Fill PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fill PDF": {
+      "main": [
+        [
+          {
+            "node": "Read fill result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Read fill result": {
+      "main": [
+        [
+          {
+            "node": "Download filled PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download filled PDF": {
+      "main": [
+        [
+          {
+            "node": "Save to Google Drive",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save to Google Drive": {
+      "main": [
+        [
+          {
+            "node": "Write link to sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Write link to sheet": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
