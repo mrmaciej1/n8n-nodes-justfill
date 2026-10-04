@@ -1,9 +1,4 @@
-# Publikacja do npm z provenance.
-#
-# Od 1 maja 2026 weryfikacja wezlow spolecznosciowych n8n wymaga, zeby paczka
-# byla publikowana przez GitHub Actions z oswiadczeniem provenance — ono
-# kryptograficznie wiaze artefakt w npm z tym repozytorium i tym workflow.
-# Publikacja z laptopa daje paczke, ktorej n8n nie zweryfikuje.
+# Publish from GitHub Actions with provenance, as required for n8n verification.
 name: publish
 
 on:
@@ -16,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # Bez tego provenance nie powstanie — to jest cala tajemnica tego pliku.
+      # OIDC permission is required to generate the provenance statement.
       id-token: write
     steps:
       - uses: actions/checkout@v4
@@ -26,17 +21,12 @@ jobs:
           node-version: 20
           registry-url: https://registry.npmjs.org
 
-      # NIE aktualizuj tu npm globalnie. `npm@latest` to dzis npm 12, ktory
-      # wymaga Node >= 22 i wywala sie na Node 20 bledem EBADENGINE. Provenance
-      # dziala od npm 9.5, a Node 20 przynosi npm 10.8 — czyli warunek jest
-      # spelniony bez zadnej aktualizacji.
-      # `--ignore-scripts`: `n8n-workflow` ciagnie natywne `isolated-vm`, ktore
-      # nie kompiluje sie na Node 20 (blad w naglowkach V8). Potrzebujemy tej
-      # paczki WYLACZNIE do typow przy `tsc`, a publikowany artefakt nie ma
-      # zadnych zaleznosci runtime — wiec kompilacja natywna jest tu zbedna.
+      # Use the npm version bundled with Node 20; it supports provenance.
+      # Skip native dependency installation scripts: n8n-workflow is used for
+      # types and tests, and the published package has no runtime dependencies.
       - run: npm ci --ignore-scripts
 
-      # `files: ["dist"]` w package.json — bez builda paczka wyszlaby pusta.
+      # Build dist before publication; it is the only packaged code directory.
       - run: npm run build
 
       - run: npm publish --provenance --access public

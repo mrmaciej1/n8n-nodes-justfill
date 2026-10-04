@@ -15,14 +15,16 @@ Want to inspect a complete workflow before installing the node? Start with the
 It accepts a PDF and JSON, maps values to reviewed field names, fills the
 existing document, and returns a temporary download link.
 
-The catalog update for template 17274 was submitted on September 5, 2026 and
-is under review. Use the repository file until the updated template is published.
+The same workflow is published in the [n8n template catalog](https://n8n.io/workflows/17274-fill-pdf-forms-from-json-data-with-justfill-and-an-n8n-form-trigger/).
+Its current mapping and updated description were verified on October 5, 2026.
 
 ## Installation
 
 This community-node installation requires **self-hosted n8n**. The package is
-not yet verified for n8n Cloud. As of September 6, 2026, the Creator Portal
-still lists version 0.1.3 as `Awaiting Video`; the current npm package is 0.1.5.
+not yet verified for n8n Cloud. On October 5, 2026, the Creator Portal showed
+`Changes Required`: translate source comments and identifiers to English, and
+remove the unused programmatic-node `requestDefaults` block. Version 0.1.6
+addresses those review items; publication alone does not mean n8n approval.
 The node submission is separate from the workflow-template review above.
 
 Settings → **Community Nodes** → Install → `n8n-nodes-justfill`
@@ -31,7 +33,9 @@ Settings → **Community Nodes** → Install → `n8n-nodes-justfill`
 install 0.1.5, test a new masked credential, list fields, fill and open a synthetic
 PDF, then let AI Agent **2.2** call the field-listing tool with a local CPU model.
 The agent example was prepared before recording. This is a working demonstration,
-not n8n approval; the portal version update remains pending.
+not n8n approval. The recording shows 0.1.5; version 0.1.6 changes source
+naming and comments and removes unused configuration, retaining the workflow
+parameters and operations.
 
 If your source is already Excel or CSV and you do not need n8n yet, use the
 [guided five-row PDF mail merge sample](https://justfill.app/solutions/fill-pdf-from-excel?utm_source=github&utm_medium=referral&utm_campaign=b2b_pdf_automation_2026q3&utm_content=n8n_node_readme_excel_batch)

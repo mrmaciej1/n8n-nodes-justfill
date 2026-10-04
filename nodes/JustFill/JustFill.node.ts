@@ -8,19 +8,17 @@ import type {
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
 /**
- * Pole zapisanego szablonu, TAK JAK ZWRACA JE API.
+ * A saved-layout field in the API response format.
  *
- * Uwaga na układ współrzędnych — to najłatwiejszy sposób, żeby wypuścić węzeł,
- * który „działa" i produkuje puste PDF-y. W projekcie żyją TRZY układy:
+ * Coordinate systems differ between services:
+ *   saved layout / AcroForm: box_2d [ymin, xmin, ymax, xmax], scaled to 0–1000
+ *   ML detection: pixels
+ *   generation API: x/y/w/h percentages, scaled to 0–100
  *
- *   szablon / AcroForm : box_2d [ymin, xmin, ymax, xmax] w skali 0–1000
- *   detekcja ML        : piksele
- *   API generowania    : x/y/w/h jako procenty 0–100
- *
- * Szablon NIE zawiera x/y/w/h. Czytanie ich dałoby `undefined` w ładunku
- * i dokument bez wpisanych wartości.
+ * Saved layouts do not contain x/y/w/h. Reading those properties directly
+ * would send undefined coordinates and produce an unfilled PDF.
  */
-interface PoleSzablonu {
+interface SavedLayoutField {
 	id?: string | null;
 	name?: string | null;
 	box_2d?: number[];
@@ -61,15 +59,15 @@ interface PoleSzablonu {
 	[k: string]: unknown;
 }
 
-/** Geometria pola przeliczona na procenty, których oczekuje API generowania. */
-interface Geometria {
+/** Field geometry converted to the percentages expected by the generation API. */
+interface FieldGeometry {
 	x: number;
 	y: number;
 	w: number;
 	h: number;
 }
 
-function geometria(p: PoleSzablonu): Geometria | null {
+function fieldGeometry(p: SavedLayoutField): FieldGeometry | null {
 	const box = p.box_2d ?? p.box2d;
 	if (!Array.isArray(box) || box.length < 4) return null;
 	const [ymin, xmin, ymax, xmax] = box;
@@ -82,21 +80,18 @@ function geometria(p: PoleSzablonu): Geometria | null {
 }
 
 /**
- * Skrót dokumentu liczony DOKŁADNIE tak jak w aplikacji i w serwerze MCP:
- * sha256 obcięte do 32 znaków. Rozjazd tutaj oznacza, że zapisany szablon nigdy
- * się nie dopasuje, a węzeł „po prostu nic nie znajdzie" — bez błędu.
+ * Match the document hash used by the app and MCP server: SHA-256 truncated
+ * to 32 hexadecimal characters. A different hash cannot find the saved layout.
  */
-function skrotDokumentu(pdf: Buffer): string {
+function documentHash(pdf: Buffer): string {
 	return createHash('sha256').update(pdf).digest('hex').slice(0, 32);
 }
 
 /**
- * Nazwa, po której użytkownik rozpoznaje pole w n8n.
- *
- * Schemat kalibracji ma `name` jako WYMAGANE, a `fieldDescription` jako
- * opcjonalny dodatek — kolejność musi być właśnie taka.
+ * The field label shown in n8n. Prefer the required calibration name, then
+ * the optional description, then the stable field ID.
  */
-function nazwaPola(p: PoleSzablonu): string {
+function fieldName(p: SavedLayoutField): string {
 	return (
 		(p.name || '').trim() ||
 		(p.fieldDescription || p.field_description || '').trim() ||
@@ -115,43 +110,43 @@ function nazwaPola(p: PoleSzablonu): string {
  * blank. Forwarding the native name makes the API update the widget and, when
  * requested, flatten its visible appearance.
  */
-export function poleDoGenerowania(
-	pole: PoleSzablonu,
+export function fieldToGenerationPayload(
+	field: SavedLayoutField,
 	value: string,
 ): Record<string, unknown> | null {
-	const g = geometria(pole);
+	const g = fieldGeometry(field);
 	if (!g) return null;
 
 	return {
-		id: pole.id ?? nazwaPola(pole),
+		id: field.id ?? fieldName(field),
 		value,
 		...g,
-		pageIndex: pole.pageIndex ?? pole.page_index ?? 0,
-		fieldDescription: pole.fieldDescription ?? pole.field_description ?? null,
-		fontSize: pole.fontSize ?? pole.font_size ?? 0,
+		pageIndex: field.pageIndex ?? field.page_index ?? 0,
+		fieldDescription: field.fieldDescription ?? field.field_description ?? null,
+		fontSize: field.fontSize ?? field.font_size ?? 0,
 		isCalibrated: true,
-		textAlign: pole.textAlign ?? pole.text_align ?? null,
-		verticalAlign: pole.verticalAlign ?? pole.vertical_align ?? null,
+		textAlign: field.textAlign ?? field.text_align ?? null,
+		verticalAlign: field.verticalAlign ?? field.vertical_align ?? null,
 		fillableFieldName:
-			pole.fillableFieldName ?? pole.fillable_field_name ?? null,
+			field.fillableFieldName ?? field.fillable_field_name ?? null,
 		fillableFieldType:
-			pole.fillableFieldType ?? pole.fillable_field_type ?? null,
+			field.fillableFieldType ?? field.fillable_field_type ?? null,
 		fillableExportValue:
-			pole.fillableExportValue ?? pole.fillable_export_value ?? null,
+			field.fillableExportValue ?? field.fillable_export_value ?? null,
 		fillableMaxLength:
-			pole.fillableMaxLength ?? pole.fillable_max_length ?? null,
-		fillableIsComb: pole.fillableIsComb ?? pole.fillable_is_comb ?? false,
+			field.fillableMaxLength ?? field.fillable_max_length ?? null,
+		fillableIsComb: field.fillableIsComb ?? field.fillable_is_comb ?? false,
 		fillableIsMultiline:
-			pole.fillableIsMultiline ?? pole.fillable_is_multiline ?? null,
+			field.fillableIsMultiline ?? field.fillable_is_multiline ?? null,
 		fillableTextAlign:
-			pole.fillableTextAlign ?? pole.fillable_text_align ?? null,
+			field.fillableTextAlign ?? field.fillable_text_align ?? null,
 		fillableTooltip:
-			pole.fillableTooltip ?? pole.fillable_tooltip ?? null,
+			field.fillableTooltip ?? field.fillable_tooltip ?? null,
 		fillableIsRequired:
-			pole.fillableIsRequired ?? pole.fillable_is_required ?? null,
+			field.fillableIsRequired ?? field.fillable_is_required ?? null,
 		fillableDefaultValue:
-			pole.fillableDefaultValue ?? pole.fillable_default_value ?? null,
-		fillableOptions: pole.fillableOptions ?? pole.fillable_options ?? null,
+			field.fillableDefaultValue ?? field.fillable_default_value ?? null,
+		fillableOptions: field.fillableOptions ?? field.fillable_options ?? null,
 	};
 }
 
@@ -159,24 +154,18 @@ export class JustFill implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'JustFill',
 		name: 'justFill',
-		// Dwa ODREBNE pliki: n8n odrzuca wskazanie tego samego dla obu motywow.
-		// Podstawowa ikona ma ciemny kafelek, wiec na ciemnej kanwie zlewalaby sie
-		// w plame — wariant `dark` odwraca kafelek i dokument, akcent marki zostaje.
+		// Use separate light and dark icons so the tile remains visible on either canvas.
 		icon: { light: 'file:justfill.svg', dark: 'file:justfill.dark.svg' },
 		group: ['transform'],
 		version: 1,
 		subtitle: '={{$parameter["operation"]}}',
 		description: 'Fill existing PDF forms — including scanned and flattened ones',
-		// Wypelnianie formularza jest sensownym narzedziem dla agenta AI, a n8n
-		// wymaga jawnej deklaracji zamiast domyslania sie.
+		// Explicitly expose this node as an AI-agent tool.
 		usableAsTool: true,
 		defaults: { name: 'JustFill' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		credentials: [{ name: 'justFillApi', required: true }],
-		requestDefaults: {
-			baseURL: '={{$credentials.baseUrl}}',
-		},
 		properties: [
 			{
 				displayName: 'Operation',
@@ -260,33 +249,32 @@ export class JustFill implements INodeType {
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
-		const wynik: INodeExecutionData[] = [];
-		const dane = await this.getCredentials('justFillApi');
-		const baza = String(dane.baseUrl || 'https://justfill.app').replace(/\/+$/, '');
+		const result: INodeExecutionData[] = [];
+		const credentials = await this.getCredentials('justFillApi');
+		const baseUrl = String(credentials.baseUrl || 'https://justfill.app').replace(/\/+$/, '');
 
 		for (let i = 0; i < items.length; i++) {
-			const operacja = this.getNodeParameter('operation', i) as string;
-			const wlasciwosc = this.getNodeParameter('binaryProperty', i) as string;
+			const operation = this.getNodeParameter('operation', i) as string;
+			const binaryProperty = this.getNodeParameter('binaryProperty', i) as string;
 
-			const pdf = await this.helpers.getBinaryDataBuffer(i, wlasciwosc);
-			const hash = skrotDokumentu(pdf);
+			const pdf = await this.helpers.getBinaryDataBuffer(i, binaryProperty);
+			const hash = documentHash(pdf);
 
-			// Układ bierzemy z szablonu zapisanego w aplikacji. To jest sedno tego
-			// węzła: pola ustawia się RAZ, wzrokowo, a potem automatyzuje — bez
-			// wykrywania na nowo przy każdym wierszu i bez zużywania limitu.
-			const szablony = (await this.helpers.httpRequestWithAuthentication.call(
+			// Reuse the layout saved in the app. Review field positions once, then fill
+			// each incoming record without repeating detection or consuming its allowance.
+			const layouts = (await this.helpers.httpRequestWithAuthentication.call(
 				this,
 				'justFillApi',
 				{
 					method: 'GET',
-					url: `${baza}/api/calibrations/by-hash/${hash}?include_others=false`,
+					url: `${baseUrl}/api/calibrations/by-hash/${hash}?include_others=false`,
 					json: true,
 				},
-			)) as { items?: Array<{ fields?: PoleSzablonu[] }> } | Array<{ fields?: PoleSzablonu[] }>;
+			)) as { items?: Array<{ fields?: SavedLayoutField[] }> } | Array<{ fields?: SavedLayoutField[] }>;
 
-			const lista = Array.isArray(szablony) ? szablony : (szablony.items ?? []);
-			const pola = lista[0]?.fields ?? [];
-			if (pola.length === 0) {
+			const layoutList = Array.isArray(layouts) ? layouts : (layouts.items ?? []);
+			const fields = layoutList[0]?.fields ?? [];
+			if (fields.length === 0) {
 				throw new NodeOperationError(
 					this.getNode(),
 					'No saved layout for this PDF. Open it once at justfill.app, review the detected fields and save it as a template — then this node fills it without re-detecting.',
@@ -294,12 +282,12 @@ export class JustFill implements INodeType {
 				);
 			}
 
-			if (operacja === 'listFields') {
-				wynik.push({
+			if (operation === 'listFields') {
+				result.push({
 					json: {
 						contentHash: hash,
-						fields: pola.map((p) => ({
-							name: nazwaPola(p),
+						fields: fields.map((p) => ({
+							name: fieldName(p),
 							id: p.id ?? null,
 							page: (p.pageIndex ?? p.page_index ?? 0) + 1,
 							type: p.type ?? 'text',
@@ -310,54 +298,53 @@ export class JustFill implements INodeType {
 				continue;
 			}
 
-			const surowe = this.getNodeParameter('values', i) as string | object;
-			const wartosci = (
-				typeof surowe === 'string' ? JSON.parse(surowe || '{}') : surowe
+			const rawValues = this.getNodeParameter('values', i) as string | object;
+			const values = (
+				typeof rawValues === 'string' ? JSON.parse(rawValues || '{}') : rawValues
 			) as Record<string, unknown>;
-			const opcje = this.getNodeParameter('options', i, {}) as {
+			const options = this.getNodeParameter('options', i, {}) as {
 				outputBinary?: string;
 				fileName?: string;
 				flatten?: boolean;
 				failOnUnknown?: boolean;
 			};
 
-			// Dopasowanie po NAZWIE albo po id. Nazwa jest tym, co użytkownik widzi
-			// w n8n i w aplikacji; id jest stabilne, ale nieczytelne.
-			const wgNazwy = new Map<string, PoleSzablonu>();
-			for (const p of pola) {
-				wgNazwy.set(nazwaPola(p).toLowerCase(), p);
-				if (p.id) wgNazwy.set(String(p.id).toLowerCase(), p);
+			// Match by the user-facing name or the stable field ID.
+			const fieldsByName = new Map<string, SavedLayoutField>();
+			for (const p of fields) {
+				fieldsByName.set(fieldName(p).toLowerCase(), p);
+				if (p.id) fieldsByName.set(String(p.id).toLowerCase(), p);
 			}
 
-			const doWypelnienia: Array<Record<string, unknown>> = [];
-			const nieznane: string[] = [];
-			for (const [klucz, wartosc] of Object.entries(wartosci)) {
-				const pole = wgNazwy.get(String(klucz).trim().toLowerCase());
-				if (!pole) {
-					nieznane.push(klucz);
+			const fieldsToFill: Array<Record<string, unknown>> = [];
+			const unknownFields: string[] = [];
+			for (const [key, value] of Object.entries(values)) {
+				const field = fieldsByName.get(String(key).trim().toLowerCase());
+				if (!field) {
+					unknownFields.push(key);
 					continue;
 				}
-				const tekst = wartosc === null || wartosc === undefined ? '' : String(wartosc);
-				if (tekst === '') continue;
-				const poleGenerowania = poleDoGenerowania(pole, tekst);
-				if (!poleGenerowania) {
+				const text = value === null || value === undefined ? '' : String(value);
+				if (text === '') continue;
+				const generationField = fieldToGenerationPayload(field, text);
+				if (!generationField) {
 					throw new NodeOperationError(
 						this.getNode(),
-						`Field "${klucz}" has no usable geometry in the saved layout (missing box_2d). Re-save the template at justfill.app.`,
+						`Field "${key}" has no usable geometry in the saved layout (missing box_2d). Re-save the template at justfill.app.`,
 						{ itemIndex: i },
 					);
 				}
-				doWypelnienia.push(poleGenerowania);
+				fieldsToFill.push(generationField);
 			}
 
-			if (nieznane.length > 0 && (opcje.failOnUnknown ?? true)) {
+			if (unknownFields.length > 0 && (options.failOnUnknown ?? true)) {
 				throw new NodeOperationError(
 					this.getNode(),
-					`No field matches: ${nieznane.join(', ')}. Run the "List Fields" operation to see the available names.`,
+					`No field matches: ${unknownFields.join(', ')}. Run the "List Fields" operation to see the available names.`,
 					{ itemIndex: i },
 				);
 			}
-			if (doWypelnienia.length === 0) {
+			if (fieldsToFill.length === 0) {
 				throw new NodeOperationError(
 					this.getNode(),
 					'None of the supplied values matched a field, so the PDF would come out empty.',
@@ -365,85 +352,72 @@ export class JustFill implements INodeType {
 				);
 			}
 
-			// `/api/generate/pdf` przyjmuje WYŁĄCZNIE multipart/form-data.
-			//
-			// Do 0.1.3 stał tu obiekt w składni biblioteki `request`
-			// (`pdf_file: { value, options }`), ale pomocnik HTTP n8n opiera się na
-			// axiosie: obiekt bez nagłówka multipart leci jako JSON, więc serwer
-			// nie widział ANI pliku, ANI pól i odpowiadał 422 („pdf_file: Field
-			// required"). Operacja `fill` — jedyny powód istnienia tego węzła —
-			// nie działała w ogóle. Wyszło to dopiero przy przejściu całej ścieżki
-			// w czystej instancji n8n 2.34 (20.08.2026); paczka miała wtedy
-			// 0 instalacji, więc nikt tego nie zgłosił.
-			//
-			// Kopertę składamy ręcznie, zamiast dokładać zależność `form-data`:
-			// jeden plik i dwa pola tekstowe to kilkanaście linii, a publikowany
-			// artefakt zostaje BEZ zależności runtime — tak jak zakłada workflow
-			// publikacji (`npm ci --ignore-scripts`).
-			const granica = `----justfill${createHash('sha256')
-				.update(`${hash}:${i}:${doWypelnienia.length}`)
+			// The generation endpoint accepts multipart/form-data only.
+			// n8n uses an Axios-based helper; the request-library object used before
+			// 0.1.4 was serialized as JSON and produced HTTP 422 (missing pdf_file).
+			// Build the one-file, two-field envelope without a runtime dependency.
+			const boundary = `----justfill${createHash('sha256')
+				.update(`${hash}:${i}:${fieldsToFill.length}`)
 				.digest('hex')
 				.slice(0, 24)}`;
-			const poleTekstowe = (nazwa: string, wartosc: string): Buffer =>
+			const textPart = (name: string, value: string): Buffer =>
 				Buffer.from(
-					`--${granica}\r\nContent-Disposition: form-data; name="${nazwa}"\r\n\r\n${wartosc}\r\n`,
+					`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`,
 					'utf8',
 				);
-			const cialoMultipart = Buffer.concat([
+			const multipartBody = Buffer.concat([
 				Buffer.from(
-					`--${granica}\r\nContent-Disposition: form-data; name="pdf_file"; filename="document.pdf"\r\n` +
+					`--${boundary}\r\nContent-Disposition: form-data; name="pdf_file"; filename="document.pdf"\r\n` +
 						'Content-Type: application/pdf\r\n\r\n',
 					'utf8',
 				),
 				pdf,
 				Buffer.from('\r\n', 'utf8'),
-				poleTekstowe('fields_json', JSON.stringify(doWypelnienia)),
-				poleTekstowe('flatten', (opcje.flatten ?? true) ? 'true' : 'false'),
-				Buffer.from(`--${granica}--\r\n`, 'utf8'),
+				textPart('fields_json', JSON.stringify(fieldsToFill)),
+				textPart('flatten', (options.flatten ?? true) ? 'true' : 'false'),
+				Buffer.from(`--${boundary}--\r\n`, 'utf8'),
 			]);
 
-			const odpowiedz = (await this.helpers.httpRequestWithAuthentication.call(
+			const response = (await this.helpers.httpRequestWithAuthentication.call(
 				this,
 				'justFillApi',
 				{
 					method: 'POST',
-					url: `${baza}/api/generate/pdf`,
-					body: cialoMultipart,
+					url: `${baseUrl}/api/generate/pdf`,
+					body: multipartBody,
 					headers: {
-						'content-type': `multipart/form-data; boundary=${granica}`,
+						'content-type': `multipart/form-data; boundary=${boundary}`,
 						accept: 'application/pdf',
 					},
-					// Bez tego pomocnik dokleiłby serializację JSON-a i zepsuł
-					// zarówno wysyłkę bajtów, jak i odbiór PDF-a.
+					// Disable JSON serialization to preserve both request bytes and the PDF response.
 					json: false,
 					encoding: 'arraybuffer',
 					returnFullResponse: true,
 				},
 			)) as { body: Buffer | ArrayBuffer; headers: Record<string, string> };
 
-			const bajty = Buffer.isBuffer(odpowiedz.body)
-				? odpowiedz.body
-				: Buffer.from(odpowiedz.body as ArrayBuffer);
-			const nazwaWyjscia = opcje.outputBinary || 'data';
-			const nazwaPliku = opcje.fileName || 'filled.pdf';
+			const bytes = Buffer.isBuffer(response.body)
+				? response.body
+				: Buffer.from(response.body as ArrayBuffer);
+			const outputBinary = options.outputBinary || 'data';
+			const fileName = options.fileName || 'filled.pdf';
 
-			// `outputMode` mowi, czy plik wyszedl CZYSTY, czy ze znakiem wodnym po
-			// wyczerpaniu limitu. Bez tego przeplyw po cichu dostarczalby dokumenty
-			// ze znakiem wodnym i nikt by sie nie zorientowal.
-			const trybWyjscia = odpowiedz.headers['x-output-mode'] ?? 'clean';
+			// Expose the output mode so workflows can detect watermarked output
+			// when the account has no clean-output allowance left.
+			const outputMode = response.headers['x-output-mode'] ?? 'clean';
 
-			wynik.push({
+			result.push({
 				json: {
 					contentHash: hash,
-					filledFields: doWypelnienia.length,
-					skippedFields: nieznane,
-					outputMode: trybWyjscia,
-					watermarked: trybWyjscia !== 'clean',
+					filledFields: fieldsToFill.length,
+					skippedFields: unknownFields,
+					outputMode: outputMode,
+					watermarked: outputMode !== 'clean',
 				},
 				binary: {
-					[nazwaWyjscia]: await this.helpers.prepareBinaryData(
-						bajty,
-						nazwaPliku,
+					[outputBinary]: await this.helpers.prepareBinaryData(
+						bytes,
+						fileName,
 						'application/pdf',
 					),
 				},
@@ -451,6 +425,6 @@ export class JustFill implements INodeType {
 			});
 		}
 
-		return [wynik];
+		return [result];
 	}
 }

@@ -10,9 +10,8 @@ export class JustFillApi implements ICredentialType {
 
 	displayName = 'JustFill API';
 
-	// Weryfikacja n8n wymaga ikony takze na klasie poswiadczen, nie tylko na
-	// wezle. Plik kopiuje sie obok skompilowanej klasy (patrz skrypt `build`),
-	// zeby nie polegac na sciezce wzglednej wychodzacej z katalogu.
+	// n8n requires a credential icon as well as a node icon. The build copies
+	// the file beside the compiled credential class.
 	icon = 'file:justfill.svg' as const;
 
 	documentationUrl = 'https://justfill.app/mcp';
@@ -37,9 +36,8 @@ export class JustFillApi implements ICredentialType {
 		},
 	];
 
-	// Klucz idzie naglowkiem, NIE ciasteczkiem. Uwierzytelnienie ciasteczkiem
-	// podlega kontroli Origin przy zapisach, ktora dla klienta spoza przegladarki
-	// nigdy nie przechodzi — a objawia sie jako 403 bez wyjasnienia.
+	// Send the API key in the Authorization header. Cookie authentication
+	// requires an Origin check that non-browser write requests cannot satisfy.
 	authenticate: IAuthenticateGeneric = {
 		type: 'generic',
 		properties: {
@@ -49,8 +47,8 @@ export class JustFillApi implements ICredentialType {
 		},
 	};
 
-	// Lista szablonow to najtanszy odczyt, ktory wymaga waznego klucza — nie
-	// zuzywa zadnego limitu i nie tworzy niczego po stronie konta.
+	// Listing saved layouts validates the key without consuming processing
+	// allowance or creating account data.
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: '={{$credentials.baseUrl}}',

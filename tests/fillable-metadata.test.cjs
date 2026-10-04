@@ -2,11 +2,11 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
-	poleDoGenerowania,
+	fieldToGenerationPayload,
 } = require('../dist/nodes/JustFill/JustFill.node.js');
 
 test('forwards snake_case AcroForm metadata from a saved calibration', () => {
-	const result = poleDoGenerowania(
+	const result = fieldToGenerationPayload(
 		{
 			id: 'acro_company',
 			name: 'Company name',
@@ -59,7 +59,7 @@ test('forwards snake_case AcroForm metadata from a saved calibration', () => {
 });
 
 test('also accepts camelCase API fields and rejects missing geometry', () => {
-	const result = poleDoGenerowania(
+	const result = fieldToGenerationPayload(
 		{
 			id: 'checkbox_terms',
 			name: 'Terms accepted',
@@ -77,5 +77,5 @@ test('also accepts camelCase API fields and rejects missing geometry', () => {
 	assert.equal(result.fillableFieldType, 'checkbox');
 	assert.equal(result.fillableExportValue, 'Yes');
 	assert.equal(result.pageIndex, 2);
-	assert.equal(poleDoGenerowania({ id: 'broken' }, 'value'), null);
+	assert.equal(fieldToGenerationPayload({ id: 'broken' }, 'value'), null);
 });
