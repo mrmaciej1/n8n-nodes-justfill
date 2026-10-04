@@ -18,17 +18,18 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '24'
           registry-url: https://registry.npmjs.org
 
-      # Use the npm version bundled with Node 20; it supports provenance.
+      # OIDC trusted publishing requires npm >=11.5.1 and Node >=22.14.0.
+      - run: npm install --global npm@11.21.0
+
       # Skip native dependency installation scripts: n8n-workflow is used for
       # types and tests, and the published package has no runtime dependencies.
       - run: npm ci --ignore-scripts
 
-      # Build dist before publication; it is the only packaged code directory.
-      - run: npm run build
+      # Build dist and verify the node contract before publication.
+      - run: npm test
 
+      # npm obtains a short-lived token for this workflow through GitHub OIDC.
       - run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
