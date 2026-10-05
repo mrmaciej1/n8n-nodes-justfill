@@ -19,7 +19,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: https://registry.npmjs.org
+
+      # Omit registry-url so setup-node does not create token authentication
+      # settings that interfere with npm's OIDC authentication.
 
       # OIDC trusted publishing requires npm >=11.5.1 and Node >=22.14.0.
       - run: npm install --global npm@11.21.0
@@ -32,4 +34,4 @@ jobs:
       - run: npm test
 
       # npm obtains a short-lived token for this workflow through GitHub OIDC.
-      - run: npm publish --provenance --access public
+      - run: npm publish --provenance --access public --registry=https://registry.npmjs.org
